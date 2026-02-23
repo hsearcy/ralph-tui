@@ -29,8 +29,8 @@ import type {
   TaskAutoCommitFailedEvent,
 } from './types.js';
 import { toEngineSubagentState } from './types.js';
-import type { RalphConfig, RateLimitHandlingConfig } from '../config/types.js';
-import { DEFAULT_RATE_LIMIT_HANDLING } from '../config/types.js';
+import type { RalphConfig, RateLimitHandlingConfig, VerificationConfig } from '../config/types.js';
+import { DEFAULT_RATE_LIMIT_HANDLING, DEFAULT_VERIFICATION } from '../config/types.js';
 import { RateLimitDetector, type RateLimitDetectionResult } from './rate-limit-detector.js';
 import type { TrackerPlugin, TrackerTask } from '../plugins/trackers/types.js';
 import type {
@@ -58,7 +58,7 @@ import { updateSessionIteration, updateSessionStatus, updateSessionMaxIterations
 import { saveIterationLog, buildSubagentTrace, getRecentProgressSummary, getCodebasePatternsForPrompt } from '../logs/index.js';
 import { performAutoCommit } from './auto-commit.js';
 import type { AgentSwitchEntry } from '../logs/index.js';
-import { renderPrompt } from '../templates/index.js';
+import { renderPrompt, getAcceptanceCriteria } from '../templates/index.js';
 import { appendWithCharLimit as appendWithSharedCharLimit } from '../utils/buffer-limits.js';
 
 /**
@@ -242,6 +242,8 @@ export class ExecutionEngine {
   private forcedTask: TrackerTask | null = null;
   /** Track if the forced task has been processed (prevents infinite loop on skip/fail) */
   private forcedTaskProcessed = false;
+  /** Track verification attempts per task for AC enforcement */
+  private verificationAttemptMap: Map<string, number> = new Map();
 
   constructor(config: RalphConfig) {
     this.config = config;
@@ -1307,7 +1309,19 @@ export class ExecutionEngine {
       // Exit code 0 alone does NOT indicate task completion - an agent may exit
       // cleanly after asking clarification questions or hitting a blocker.
       // See: https://github.com/subsy/ralph-tui/issues/259
-      const taskCompleted = promiseComplete;
+      let taskCompleted = promiseComplete;
+      let verificationFailureReason: string | undefined;
+
+      // Verify acceptance criteria before marking task as completed
+      if (promiseComplete) {
+        const verification = await this.verifyAcceptanceCriteria(
+          task, agentResult.stdout, iteration
+        );
+        if (!verification.passed) {
+          taskCompleted = false;
+          verificationFailureReason = verification.reason;
+        }
+      }
 
       // Update tracker if task completed
       // In worker mode (forcedTask set), skip tracker update — the ParallelExecutor
@@ -1328,6 +1342,9 @@ export class ExecutionEngine {
         // Clear rate-limited agents tracking on task completion
         // This allows agents to be retried for the next task
         this.clearRateLimitedAgents();
+
+        // Clear verification attempt tracking on task completion
+        this.verificationAttemptMap.delete(`verify:${task.id}`);
       }
 
       // Auto-commit after task completion (before iteration log is saved)
@@ -1358,6 +1375,7 @@ export class ExecutionEngine {
           : summarizeTokenUsageFromOutput(agentResult.stdout),
         startedAt: startedAt.toISOString(),
         endedAt: endedAt.toISOString(),
+        verificationFailure: verificationFailureReason,
       };
 
       // Save iteration output to .ralph-tui/iterations/ directory
@@ -2231,6 +2249,161 @@ export class ExecutionEngine {
         iteration,
         error: err instanceof Error ? err.message : String(err),
       });
+    }
+  }
+
+  /**
+   * Verify acceptance criteria are met by spawning a verification agent call.
+   * Returns { passed: true } if AC are met, no AC exist, verification is
+   * disabled, or verification itself fails (fail-open).
+   */
+  private async verifyAcceptanceCriteria(
+    task: TrackerTask,
+    agentStdout: string,
+    iteration: number,
+  ): Promise<{ passed: boolean; reason?: string }> {
+    const verificationConfig: VerificationConfig = {
+      ...DEFAULT_VERIFICATION,
+      ...(this.config.verification ?? {}),
+    };
+
+    if (!verificationConfig.enabled) {
+      return { passed: true };
+    }
+
+    // Extract AC using the shared template utility
+    const ac = getAcceptanceCriteria(task);
+
+    // If no AC exist, skip verification (preserve current behavior)
+    if (!ac.trim()) {
+      return { passed: true };
+    }
+
+    // Track attempt count per task
+    const attemptKey = `verify:${task.id}`;
+    const currentAttempt = (this.verificationAttemptMap.get(attemptKey) ?? 0) + 1;
+    this.verificationAttemptMap.set(attemptKey, currentAttempt);
+
+    // If max attempts exceeded, accept without verification (fail-open)
+    if (currentAttempt > verificationConfig.maxAttempts) {
+      this.verificationAttemptMap.delete(attemptKey);
+      return { passed: true };
+    }
+
+    this.emit({
+      type: 'task:verification-started',
+      timestamp: new Date().toISOString(),
+      task,
+      iteration,
+      attempt: currentAttempt,
+      maxAttempts: verificationConfig.maxAttempts,
+    });
+
+    // Truncate stdout to last ~10K chars to keep the verification prompt focused
+    const stdoutSummary = agentStdout.length > 10_000
+      ? '...[truncated]...\n' + agentStdout.slice(-10_000)
+      : agentStdout;
+
+    const verificationPrompt = [
+      '## Acceptance Criteria Verification',
+      '',
+      'You are verifying whether the following acceptance criteria have been met.',
+      'Review the agent output summary and the current state of the codebase.',
+      '',
+      '### Acceptance Criteria',
+      ac,
+      '',
+      '### Agent Work Summary',
+      '```',
+      stdoutSummary,
+      '```',
+      '',
+      '### Instructions',
+      'Check each acceptance criterion. You may read files and run commands to verify.',
+      'Then respond with your verdict:',
+      '- If ALL criteria are met: <ac-verdict>PASS</ac-verdict>',
+      '- If ANY criterion is NOT met: <ac-verdict>FAIL: [explain which criteria failed and why]</ac-verdict>',
+      '',
+      'Important: Be thorough but concise. Focus on verifiable facts, not style preferences.',
+    ].join('\n');
+
+    const startTime = Date.now();
+
+    try {
+      const flags: string[] = [];
+      if (this.config.model) {
+        flags.push('--model', this.config.model);
+      }
+
+      const handle = this.agent!.execute(verificationPrompt, [], {
+        cwd: this.config.cwd,
+        timeout: verificationConfig.timeoutMs,
+        flags,
+        sandbox: this.config.sandbox,
+      });
+
+      const result = await handle.promise;
+      const durationMs = Date.now() - startTime;
+
+      // Parse verdict from output
+      const verdictMatch = result.stdout.match(/<ac-verdict>([\s\S]*?)<\/ac-verdict>/i);
+
+      if (!verdictMatch) {
+        // No structured verdict — treat as inconclusive, allow completion (fail-open)
+        this.emit({
+          type: 'task:verification-passed',
+          timestamp: new Date().toISOString(),
+          task,
+          iteration,
+          attempt: currentAttempt,
+          durationMs,
+        });
+        this.verificationAttemptMap.delete(attemptKey);
+        return { passed: true };
+      }
+
+      const verdict = verdictMatch[1]!.trim();
+
+      if (verdict.toUpperCase().startsWith('PASS')) {
+        this.emit({
+          type: 'task:verification-passed',
+          timestamp: new Date().toISOString(),
+          task,
+          iteration,
+          attempt: currentAttempt,
+          durationMs,
+        });
+        this.verificationAttemptMap.delete(attemptKey);
+        return { passed: true };
+      }
+
+      // Verification failed
+      const failReason = verdict.replace(/^FAIL:\s*/i, '').trim() || 'Acceptance criteria not met';
+      this.emit({
+        type: 'task:verification-failed',
+        timestamp: new Date().toISOString(),
+        task,
+        iteration,
+        attempt: currentAttempt,
+        maxAttempts: verificationConfig.maxAttempts,
+        reason: failReason,
+        durationMs,
+      });
+
+      return { passed: false, reason: failReason };
+    } catch {
+      // Verification execution failed — don't block completion (fail-open)
+      const durationMs = Date.now() - startTime;
+      this.emit({
+        type: 'task:verification-passed',
+        timestamp: new Date().toISOString(),
+        task,
+        iteration,
+        attempt: currentAttempt,
+        durationMs,
+      });
+      this.verificationAttemptMap.delete(attemptKey);
+      return { passed: true };
     }
   }
 

@@ -19,7 +19,9 @@ import {
   DEFAULT_CONFIG,
   DEFAULT_ERROR_HANDLING,
   DEFAULT_SANDBOX_CONFIG,
+  DEFAULT_VERIFICATION,
 } from "./types.js";
+import type { VerificationConfig } from "./types.js";
 import type { ErrorHandlingConfig } from "../engine/types.js";
 import type { AgentPluginConfig } from "../plugins/agents/types.js";
 import type { TrackerPluginConfig } from "../plugins/trackers/types.js";
@@ -235,6 +237,9 @@ function mergeConfigs(
   }
   if (project.sandbox !== undefined) {
     merged.sandbox = { ...merged.sandbox, ...project.sandbox };
+  }
+  if (project.verification !== undefined) {
+    merged.verification = { ...merged.verification, ...project.verification };
   }
 
   // Override prompt template
@@ -666,6 +671,11 @@ export async function buildConfig(
     ...(options.sandbox ?? {}),
   };
 
+  const verification: VerificationConfig = {
+    ...DEFAULT_VERIFICATION,
+    ...(storedConfig.verification ?? {}),
+  };
+
   return {
     agent: agentConfig,
     tracker: trackerConfig,
@@ -689,6 +699,7 @@ export async function buildConfig(
     model: options.model,
     showTui: !options.headless,
     errorHandling,
+    verification,
     sandbox,
     // CLI --prompt takes precedence over config file prompt_template
     promptTemplate: options.promptPath ?? storedConfig.prompt_template,

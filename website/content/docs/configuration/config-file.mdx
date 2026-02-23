@@ -130,6 +130,20 @@ enabled = true
 sound = "off"
 
 # ─────────────────────────────────────────────
+# Acceptance Criteria Verification
+# ─────────────────────────────────────────────
+
+[verification]
+# Verify acceptance criteria before marking tasks complete (default: false)
+enabled = false
+
+# Max verification attempts before accepting without verification (default: 2)
+maxAttempts = 2
+
+# Timeout for the verification agent call in milliseconds (default: 120000)
+timeoutMs = 120000
+
+# ─────────────────────────────────────────────
 # Parallel Execution
 # ─────────────────────────────────────────────
 
@@ -194,6 +208,26 @@ enabled = true
 maxRetries = 5
 baseBackoffMs = 10000
 ```
+
+### Quality-Gated Workflow
+
+For enforcing acceptance criteria before marking tasks complete:
+
+```toml
+agent = "claude"
+tracker = "beads-bv"
+
+[verification]
+enabled = true
+maxAttempts = 3
+timeoutMs = 120000
+
+[errorHandling]
+strategy = "retry"
+maxRetries = 3
+```
+
+When enabled, the engine spawns a verification agent call after the agent signals task completion. The verifier checks whether the acceptance criteria from the task description are actually met. If not, the task stays in progress and the next iteration retries with feedback about what was missing.
 
 ### Headless/CI Setup
 

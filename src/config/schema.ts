@@ -42,6 +42,15 @@ export const RateLimitHandlingConfigSchema = z.object({
   recoverPrimaryBetweenIterations: z.boolean().optional(),
 });
 
+/**
+ * Acceptance criteria verification configuration schema
+ */
+export const VerificationConfigSchema = z.object({
+  enabled: z.boolean().optional(),
+  maxAttempts: z.number().int().min(1).max(10).optional(),
+  timeoutMs: z.number().int().min(5000).max(600000).optional(),
+});
+
 export const SandboxConfigSchema = z.object({
   enabled: z.boolean().optional(),
   mode: SandboxModeSchema.optional(),
@@ -218,6 +227,9 @@ export const StoredConfigSchema = z
 
     // Conflict resolution configuration for parallel execution
     conflictResolution: ConflictResolutionConfigSchema.optional(),
+
+    // Acceptance criteria verification configuration
+    verification: VerificationConfigSchema.optional(),
   })
   .strict();
 

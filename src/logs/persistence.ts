@@ -249,6 +249,7 @@ export function buildMetadata(
     sandboxMode: sandboxConfig?.mode,
     resolvedSandboxMode,
     sandboxNetwork: sandboxConfig?.network,
+    verificationFailure: result.verificationFailure,
   };
 }
 
@@ -336,6 +337,10 @@ function formatMetadataHeader(metadata: IterationLogMetadata): string {
 
   if (metadata.error) {
     lines.push(`- **Error**: ${metadata.error}`);
+  }
+
+  if (metadata.verificationFailure) {
+    lines.push(`- **Verification Failed**: ${metadata.verificationFailure}`);
   }
 
   if (metadata.agentPlugin) {
@@ -540,6 +545,7 @@ function parseMetadataHeader(header: string): IterationLogMetadata | null {
     }
 
     const error = extractValue('Error');
+    const verificationFailure = extractValue('Verification Failed');
     const agentPlugin = extractValue('Agent');
     const model = extractValue('Model');
     const epicId = extractValue('Epic');
@@ -606,6 +612,7 @@ function parseMetadataHeader(header: string): IterationLogMetadata | null {
       sandboxMode,
       resolvedSandboxMode,
       sandboxNetwork,
+      verificationFailure,
     };
   } catch {
     return null;

@@ -258,7 +258,7 @@ function stripAcceptanceCriteria(description: string | undefined): string {
  * @param task The task to extract criteria from
  * @returns Formatted acceptance criteria string
  */
-function getAcceptanceCriteria(task: TrackerTask): string {
+export function getAcceptanceCriteria(task: TrackerTask): string {
   // First check metadata (used by JSON tracker)
   const metaCriteria = task.metadata?.acceptanceCriteria;
   if (Array.isArray(metaCriteria) && metaCriteria.length > 0) {

@@ -416,6 +416,41 @@ sound = "off"
 | `"system"` | Use OS default notification sound |
 | `"ralph"` | Play random Ralph Wiggum sound clips |
 
+## Acceptance Criteria Verification
+
+Controls whether the engine verifies acceptance criteria (AC) before marking tasks as complete. When enabled, after an agent signals `<promise>COMPLETE</promise>`, the engine spawns a separate verification call that checks the task's AC against the work done. If AC aren't met, the task stays `in_progress` and the next iteration retries with feedback.
+
+```toml
+[verification]
+enabled = true
+maxAttempts = 2
+timeoutMs = 120000
+```
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `enabled` | boolean | `false` | Verify AC before marking tasks complete |
+| `maxAttempts` | number | `2` | Max verification attempts before accepting without verification (1-10) |
+| `timeoutMs` | number | `120000` | Timeout for the verification agent call in ms (5000-600000) |
+
+### How It Works
+
+1. Agent completes work and outputs `<promise>COMPLETE</promise>`
+2. Engine extracts acceptance criteria from the task (metadata or description)
+3. If AC exist and verification is enabled, a verification agent call is spawned
+4. The verifier responds with `<ac-verdict>PASS</ac-verdict>` or `<ac-verdict>FAIL: reason</ac-verdict>`
+5. On PASS, the task is marked complete as usual
+6. On FAIL, the task stays `in_progress` and the failure reason is recorded in the iteration log
+7. The next iteration naturally sees the failure context and retries
+
+### Fail-Open Behavior
+
+Verification is designed to **fail open** — if the verification call itself errors, times out, or returns no structured verdict, the task is accepted as complete. This ensures verification never blocks a working system. After `maxAttempts` verification failures for a single task, the engine also accepts without verification.
+
+<Callout type="info">
+Acceptance criteria are extracted from task metadata (`acceptanceCriteria` array) or parsed from the task description (`## Acceptance Criteria` sections or `- [ ]` checklists). If no AC are found, verification is skipped automatically.
+</Callout>
+
 ## Parallel Execution
 
 Configure parallel execution behavior.
@@ -594,6 +629,8 @@ All numeric options have validation constraints:
 | `errorHandling.retryDelayMs` | 0 | 300000 |
 | `rateLimitHandling.maxRetries` | 0 | 10 |
 | `rateLimitHandling.baseBackoffMs` | 0 | 300000 |
+| `verification.maxAttempts` | 1 | 10 |
+| `verification.timeoutMs` | 5000 | 600000 |
 
 ## Environment Variables
 

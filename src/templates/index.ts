@@ -27,6 +27,7 @@ export {
   installGlobalTemplates,
   getProjectTemplatePath,
   getGlobalTemplatePath,
+  getAcceptanceCriteria,
 } from './engine.js';
 
 export {

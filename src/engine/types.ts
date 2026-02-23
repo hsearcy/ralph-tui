@@ -189,6 +189,9 @@ export interface IterationResult {
 
   /** Timestamp when iteration ended (ISO 8601) */
   endedAt: string;
+
+  /** Verification failure reason if AC check failed (task not marked complete) */
+  verificationFailure?: string;
 }
 
 /**
@@ -211,6 +214,9 @@ export type EngineEventType =
   | 'task:selected'
   | 'task:activated'
   | 'task:completed'
+  | 'task:verification-started'
+  | 'task:verification-passed'
+  | 'task:verification-failed'
   | 'task:auto-committed'
   | 'task:auto-commit-failed'
   | 'task:auto-commit-skipped'
@@ -467,6 +473,55 @@ export interface TaskCompletedEvent extends EngineEventBase {
 }
 
 /**
+ * Task verification started event - emitted when AC verification begins
+ */
+export interface TaskVerificationStartedEvent extends EngineEventBase {
+  type: 'task:verification-started';
+  /** Task being verified */
+  task: TrackerTask;
+  /** Iteration number */
+  iteration: number;
+  /** Current verification attempt (1-based) */
+  attempt: number;
+  /** Maximum verification attempts allowed */
+  maxAttempts: number;
+}
+
+/**
+ * Task verification passed event - AC requirements are met
+ */
+export interface TaskVerificationPassedEvent extends EngineEventBase {
+  type: 'task:verification-passed';
+  /** Task that passed verification */
+  task: TrackerTask;
+  /** Iteration number */
+  iteration: number;
+  /** Verification attempt number */
+  attempt: number;
+  /** Duration of the verification call in ms */
+  durationMs: number;
+}
+
+/**
+ * Task verification failed event - AC requirements are NOT met
+ */
+export interface TaskVerificationFailedEvent extends EngineEventBase {
+  type: 'task:verification-failed';
+  /** Task that failed verification */
+  task: TrackerTask;
+  /** Iteration number */
+  iteration: number;
+  /** Verification attempt number */
+  attempt: number;
+  /** Maximum verification attempts allowed */
+  maxAttempts: number;
+  /** Why verification failed */
+  reason: string;
+  /** Duration of the verification call in ms */
+  durationMs: number;
+}
+
+/**
  * Task auto-committed event - emitted when auto-commit creates a git commit after task completion
  */
 export interface TaskAutoCommittedEvent extends EngineEventBase {
@@ -638,6 +693,9 @@ export type EngineEvent =
   | TaskSelectedEvent
   | TaskActivatedEvent
   | TaskCompletedEvent
+  | TaskVerificationStartedEvent
+  | TaskVerificationPassedEvent
+  | TaskVerificationFailedEvent
   | TaskAutoCommittedEvent
   | TaskAutoCommitFailedEvent
   | TaskAutoCommitSkippedEvent

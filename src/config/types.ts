@@ -336,6 +336,9 @@ export interface StoredConfig {
 
   /** Conflict resolution configuration for parallel execution */
   conflictResolution?: ConflictResolutionConfig;
+
+  /** Acceptance criteria verification configuration */
+  verification?: Partial<VerificationConfig>;
 }
 
 /**
@@ -377,6 +380,9 @@ export interface RalphConfig {
 
   /** Error handling configuration */
   errorHandling: ErrorHandlingConfig;
+
+  /** Acceptance criteria verification configuration */
+  verification?: VerificationConfig;
 
   sandbox?: SandboxConfig;
 
@@ -422,6 +428,30 @@ export const DEFAULT_ERROR_HANDLING: ErrorHandlingConfig = {
   maxRetries: 3,
   retryDelayMs: 5000,
   continueOnNonZeroExit: false,
+};
+
+/**
+ * Configuration for acceptance criteria verification.
+ * When enabled, the engine verifies AC are met before marking tasks complete.
+ */
+export interface VerificationConfig {
+  /** Whether to verify AC before marking tasks complete (default: false) */
+  enabled: boolean;
+
+  /** Max verification attempts before accepting without verification (default: 2) */
+  maxAttempts: number;
+
+  /** Timeout in ms for the verification agent call (default: 120000) */
+  timeoutMs: number;
+}
+
+/**
+ * Default verification configuration (disabled by default)
+ */
+export const DEFAULT_VERIFICATION: VerificationConfig = {
+  enabled: false,
+  maxAttempts: 2,
+  timeoutMs: 120_000,
 };
 
 /**

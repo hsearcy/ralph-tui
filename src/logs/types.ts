@@ -117,6 +117,9 @@ export interface IterationLogMetadata {
 
   /** Whether network access was enabled in sandbox */
   sandboxNetwork?: boolean;
+
+  /** Verification failure reason if AC check failed (task not marked complete) */
+  verificationFailure?: string;
 }
 
 /**
