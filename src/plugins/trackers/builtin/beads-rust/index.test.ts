@@ -465,7 +465,7 @@ describe('BeadsRustTrackerPlugin', () => {
       expect(tasks[0]?.priority).toBe(4);
     });
 
-    test('preserves original order for IDs not matching child ID pattern', async () => {
+    test('preserves original order when no IDs match dotted child pattern', async () => {
       mockSpawnResponses = [
         { exitCode: 0, stdout: 'br version 0.4.1\n' },
         {
@@ -474,7 +474,7 @@ describe('BeadsRustTrackerPlugin', () => {
             { id: 'proj-12', title: 'Twelve', status: 'open', priority: 2 },
             { id: 'proj-2', title: 'Two', status: 'open', priority: 2 },
             { id: 'thing.xyz', title: 'Dotted non-numeric', status: 'open', priority: 2 },
-            { id: 'thing.abj', title: 'Another dotted', status: 'open', priority: 2 },
+            { id: 'thing.abj', title: 'Another dotted non-numeric', status: 'open', priority: 2 },
           ]),
         },
       ];
@@ -485,19 +485,26 @@ describe('BeadsRustTrackerPlugin', () => {
 
       const tasks = await plugin.getTasks();
 
-      // Non-child IDs (including dots with non-numeric suffixes) keep original CLI order
-      expect(tasks.map((t) => t.id)).toEqual(['proj-12', 'proj-2', 'thing.xyz', 'thing.abj']);
+      expect(tasks.map((t) => t.id)).toEqual([
+        'proj-12',
+        'proj-2',
+        'thing.xyz',
+        'thing.abj',
+      ]);
     });
 
-    test('sorts dotted child IDs numerically, not lexicographically', async () => {
+    test('sorts dotted child IDs numerically in mixed lists while preserving non-child slots', async () => {
       mockSpawnResponses = [
         { exitCode: 0, stdout: 'br version 0.4.1\n' },
         {
           exitCode: 0,
           stdout: JSON.stringify([
             { id: 'epic-5.12', title: 'Child 12', status: 'open', priority: 2 },
+            { id: 'task-alpha', title: 'Non-child A', status: 'open', priority: 2 },
             { id: 'epic-5.2', title: 'Child 2', status: 'open', priority: 2 },
+            { id: 'thing.xyz', title: 'Dotted non-numeric', status: 'open', priority: 2 },
             { id: 'epic-5.1', title: 'Child 1', status: 'open', priority: 2 },
+            { id: 'task-beta', title: 'Non-child B', status: 'open', priority: 2 },
             { id: 'epic-5.9', title: 'Child 9', status: 'open', priority: 2 },
           ]),
         },
@@ -509,12 +516,13 @@ describe('BeadsRustTrackerPlugin', () => {
 
       const tasks = await plugin.getTasks();
 
-      // Lexicographic would produce: epic-5.1, epic-5.12, epic-5.2, epic-5.9
-      // Numeric should produce: epic-5.1, epic-5.2, epic-5.9, epic-5.12
       expect(tasks.map((t) => t.id)).toEqual([
         'epic-5.1',
+        'task-alpha',
         'epic-5.2',
+        'thing.xyz',
         'epic-5.9',
+        'task-beta',
         'epic-5.12',
       ]);
     });

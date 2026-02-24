@@ -1602,6 +1602,14 @@ export class ExecutionEngine {
   }
 
   /**
+   * Update the autoCommit setting at runtime.
+   * Allows the TUI settings view to toggle auto-commit without restarting.
+   */
+  setAutoCommit(value: boolean): void {
+    this.config.autoCommit = value;
+  }
+
+  /**
    * Continue execution after adding more iterations.
    * Call this after addIterations() returns true.
    */

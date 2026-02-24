@@ -9,6 +9,7 @@ import { constants } from 'node:fs';
 import { access, readFile } from 'node:fs/promises';
 import { resolve, relative, isAbsolute, join } from 'node:path';
 import { BaseTrackerPlugin } from '../../base.js';
+import { sortDottedChildTaskIds } from '../../task-ordering.js';
 import { BEADS_RUST_TEMPLATE } from '../../../../templates/builtin.js';
 import type {
   SyncResult,
@@ -404,6 +405,7 @@ export class BeadsRustTrackerPlugin extends BaseTrackerPlugin {
         : undefined
       : filter;
     tasks = this.filterTasks(tasks, filterWithoutParent);
+    tasks = sortDottedChildTaskIds(tasks);
 
     // Enrich dependencies after all filtering so we only query tasks that will
     // actually be used by the executor.

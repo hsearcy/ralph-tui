@@ -9,6 +9,7 @@ import { access, constants } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { BaseTrackerPlugin } from '../../base.js';
+import { sortDottedChildTaskIds } from '../../task-ordering.js';
 import { BEADS_TEMPLATE } from '../../../../templates/builtin.js';
 import type {
   SetupQuestion,
@@ -425,6 +426,7 @@ export class BeadsTrackerPlugin extends BaseTrackerPlugin {
     // (bd list --json doesn't include parent field in output, so filterTasks would incorrectly remove tasks)
     const filterWithoutParent = filter ? { ...filter, parentId: undefined } : undefined;
     tasks = this.filterTasks(tasks, filterWithoutParent);
+    tasks = sortDottedChildTaskIds(tasks);
 
     // Enrich dependencies after filtering so we only query tasks that will be used.
     await this.enrichDependencies(tasks, beads);
