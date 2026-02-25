@@ -42,6 +42,7 @@ interface BrTaskJson {
   updated_at?: string;
   labels?: string[];
   parent?: string;
+  acceptance_criteria?: string;
   dependency_count?: number;
   dependent_count?: number;
   dependencies?: Array<{
@@ -227,6 +228,7 @@ function brTaskToTask(task: BrTaskJson): TrackerTask {
     status: mapStatus(task.status),
     priority: mapPriority(task.priority),
     description: task.description,
+    acceptanceCriteria: task.acceptance_criteria,
     labels: task.labels,
     type: task.issue_type,
     parentId,

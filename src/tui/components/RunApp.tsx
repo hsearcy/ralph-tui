@@ -19,7 +19,7 @@ import { RightPanel } from './RightPanel.js';
 import { IterationHistoryView } from './IterationHistoryView.js';
 import { IterationDetailView } from './IterationDetailView.js';
 import type { HistoricExecutionContext } from './IterationDetailView.js';
-import { ProgressDashboard } from './ProgressDashboard.js';
+import { ProgressDashboard, type ProgressDashboardProps } from './ProgressDashboard.js';
 import { ConfirmationDialog } from './ConfirmationDialog.js';
 import { HelpOverlay } from './HelpOverlay.js';
 import { SettingsView } from './SettingsView.js';
@@ -254,6 +254,7 @@ function trackerTaskToTaskItem(task: TrackerTask): TaskItem {
     title: task.title,
     status: trackerStatusToTaskStatus(task.status),
     description: task.description,
+    acceptanceCriteria: task.acceptanceCriteria,
     priority: task.priority,
     labels: task.labels,
     type: task.type,
@@ -634,6 +635,10 @@ export function RunApp({
   const [conflictSelectedIndex, setConflictSelectedIndex] = useState(0);
   // Show/hide closed tasks filter (default: show closed tasks)
   const [showClosedTasks, setShowClosedTasks] = useState(true);
+  // Acceptance criteria verification status for dashboard display
+  const [verificationStatus, setVerificationStatus] = useState<
+    ProgressDashboardProps['verificationStatus']
+  >(undefined);
   // Track prior summary-line count so auto-open only happens on empty -> non-empty transition.
   const prevParallelSummaryLinesCountRef = useRef(0);
   // Cache for historical iteration output loaded from disk (taskId -> { output, timing, agent, model })
@@ -1741,6 +1746,67 @@ export function RunApp({
               t.id === event.task.id ? { ...t, status: 'done' as TaskStatus } : t
             )
           );
+          // Clear verification status but keep currentTaskId and output intact.
+          // This lets the verification result remain visible in the output panel.
+          // The next iteration:started or task:selected will clean up.
+          setVerificationStatus(undefined);
+          setStatus('selecting');
+          break;
+
+        case 'task:verification-started':
+          setVerificationStatus({
+            state: 'verifying',
+            taskId: event.task.id,
+            attempt: event.attempt,
+            maxAttempts: event.maxAttempts,
+          });
+          // Restore task context so the output panel displays verification output.
+          // iteration:completed clears currentTaskId, but verification runs after
+          // that — we need to re-set it so the display logic shows the output.
+          setCurrentTaskId(event.task.id);
+          setCurrentTaskTitle(event.task.title);
+          currentTaskIdRef.current = event.task.id;
+          setStatus('executing');
+          // Reset output and seed with a visible status message.
+          // The verification agent's stdout may be buffered until completion,
+          // so this ensures the output panel shows something immediately.
+          outputParserRef.current.reset();
+          {
+            const header = `--- Verifying acceptance criteria (attempt ${event.attempt}/${event.maxAttempts}) ---\n`;
+            outputParserRef.current.push(header);
+            setCurrentOutput(outputParserRef.current.getOutput());
+          }
+          setCurrentSegments([]);
+          break;
+
+        case 'task:verification-passed':
+          setVerificationStatus({
+            state: 'passed',
+            taskId: event.task.id,
+            attempt: event.attempt,
+          });
+          // Append result to output so it's visible in the panel
+          {
+            const passMsg = '\n--- Acceptance criteria: PASSED ---\n';
+            outputParserRef.current.push(passMsg);
+            setCurrentOutput(outputParserRef.current.getOutput());
+          }
+          break;
+
+        case 'task:verification-failed':
+          setVerificationStatus({
+            state: 'failed',
+            taskId: event.task.id,
+            attempt: event.attempt,
+            maxAttempts: event.maxAttempts,
+            reason: event.reason,
+          });
+          // Append result to output so the failure reason is visible
+          {
+            const failMsg = `\n--- Acceptance criteria: FAILED ---\n${event.reason ?? 'No reason provided'}\n`;
+            outputParserRef.current.push(failMsg);
+            setCurrentOutput(outputParserRef.current.getOutput());
+          }
           break;
 
         case 'agent:output':
@@ -2899,8 +2965,11 @@ export function RunApp({
     const isActiveTask = effectiveTaskStatus === 'active' || effectiveTaskStatus === 'in_progress';
     const isExecuting = currentTaskId === effectiveTaskId || isActiveTask;
     // Only use currentOutput if we have actual content - on session resume, currentOutput is empty
-    // but the task is marked "active", so we should fall through to historical cache lookup
-    if (isExecuting && currentTaskId && currentOutput) {
+    // but the task is marked "active", so we should fall through to historical cache lookup.
+    // Exception: during AC verification, show the live output panel even when empty so the
+    // verification output streams in as it arrives (instead of showing "Task not yet executed").
+    const isVerifying = verificationStatus?.state === 'verifying';
+    if (isExecuting && currentTaskId && (currentOutput || isVerifying)) {
       // Use the captured start time from the iteration:started event
       const timing: IterationTimingInfo = {
         startedAt: currentIterationStartedAt,
@@ -2978,6 +3047,7 @@ export function RunApp({
     parallelWorkerOutputs,
     taskUsageMap,
     remoteTaskUsageMap,
+    verificationStatus,
   ]);
 
   // Compute the actual output to display based on selectedSubagentId
@@ -3435,6 +3505,8 @@ export function RunApp({
           activeWorkerCount={activeWorkerCount}
           totalWorkerCount={totalWorkerCount}
           aggregateUsage={displayAggregateUsage}
+          verificationEnabled={storedConfig?.verification?.enabled === true}
+          verificationStatus={verificationStatus}
         />
       )}
 

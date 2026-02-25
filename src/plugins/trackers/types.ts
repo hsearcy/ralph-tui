@@ -39,6 +39,9 @@ export interface TrackerTask {
   /** Detailed description or body text */
   description?: string;
 
+  /** Acceptance criteria (raw text, typically markdown checklist) */
+  acceptanceCriteria?: string;
+
   /** Labels or tags associated with the task */
   labels?: string[];
 

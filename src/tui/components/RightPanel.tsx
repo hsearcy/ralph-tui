@@ -271,7 +271,7 @@ function TaskMetadataView({
   const statusIndicator = getTaskStatusIndicator(task.status);
   // Check metadata for acceptance criteria (JSON tracker stores it there)
   const metadataCriteria = task.metadata?.acceptanceCriteria;
-  const criteria = parseAcceptanceCriteria(task.description, undefined, metadataCriteria);
+  const criteria = parseAcceptanceCriteria(task.description, task.acceptanceCriteria, metadataCriteria);
   const cleanDescription = extractDescription(task.description);
 
   return (

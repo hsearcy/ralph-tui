@@ -103,9 +103,14 @@ export const BEADS_TEMPLATE = `{{!-- Full PRD for project context (agent studies
 {{else}}
 5. Do NOT create git commits. Leave all changes uncommitted for manual review.
 {{/if}}
-6. Close the bead: \`bd close {{taskId}} --db {{beadsDbPath}} --reason "Brief description"\`
-7. Document learnings (see below)
+6. Document learnings (see below)
+{{#if config.verification.enabled}}
+7. **DO NOT** close the bead yourself — the engine will close it automatically after verifying acceptance criteria
 8. Signal completion
+{{else}}
+7. Close the bead: \`bd close {{taskId}} --db {{beadsDbPath}} --reason "Brief description"\`
+8. Signal completion
+{{/if}}
 
 ## Before Completing
 APPEND to \`.ralph-tui/progress.md\`:
@@ -123,6 +128,9 @@ If you discovered a **reusable pattern**, also add it to the \`## Codebase Patte
 
 ## Stop Condition
 **IMPORTANT**: If the work is already complete (implemented in a previous iteration or already exists), verify it works correctly and signal completion immediately.
+{{#if config.verification.enabled}}
+**IMPORTANT**: Do NOT run \`bd close\` — the engine handles bead closure after AC verification.
+{{/if}}
 
 When finished (or if already complete), signal completion with:
 <promise>COMPLETE</promise>
@@ -201,9 +209,14 @@ Completing this task will unblock: {{blocks}}
 {{else}}
 5. Do NOT create git commits. Leave all changes uncommitted for manual review.
 {{/if}}
-6. Close the bead: \`bd close {{taskId}} --db {{beadsDbPath}} --reason "Brief description"\`
-7. Document learnings (see below)
+6. Document learnings (see below)
+{{#if config.verification.enabled}}
+7. **DO NOT** close the bead yourself — the engine will close it automatically after verifying acceptance criteria
 8. Signal completion
+{{else}}
+7. Close the bead: \`bd close {{taskId}} --db {{beadsDbPath}} --reason "Brief description"\`
+8. Signal completion
+{{/if}}
 
 ## Before Completing
 APPEND to \`.ralph-tui/progress.md\`:
@@ -221,6 +234,9 @@ If you discovered a **reusable pattern**, also add it to the \`## Codebase Patte
 
 ## Stop Condition
 **IMPORTANT**: If the work is already complete (implemented in a previous iteration or already exists), verify it works correctly and signal completion immediately.
+{{#if config.verification.enabled}}
+**IMPORTANT**: Do NOT run \`bd close\` — the engine handles bead closure after AC verification.
+{{/if}}
 
 When finished (or if already complete), signal completion with:
 <promise>COMPLETE</promise>
@@ -287,10 +303,15 @@ export const BEADS_RUST_TEMPLATE = `{{!-- Full PRD for project context (agent st
 {{else}}
 5. Do NOT create git commits. Leave all changes uncommitted for manual review.
 {{/if}}
-6. Close the bead: \`br close {{taskId}} --reason "Brief description"\`
-7. Flush tracker state to JSONL (no git side effects): \`br sync --flush-only\`
-8. Document learnings (see below)
+6. Document learnings (see below)
+{{#if config.verification.enabled}}
+7. **DO NOT** close the bead yourself — the engine will close it automatically after verifying acceptance criteria
+8. Signal completion
+{{else}}
+7. Close the bead: \`br close {{taskId}} --reason "Brief description"\`
+8. Flush tracker state to JSONL (no git side effects): \`br sync --flush-only\`
 9. Signal completion
+{{/if}}
 
 ## Before Completing
 APPEND to \`.ralph-tui/progress.md\`:
@@ -308,6 +329,9 @@ If you discovered a **reusable pattern**, also add it to the \`## Codebase Patte
 
 ## Stop Condition
 **IMPORTANT**: If the work is already complete (implemented in a previous iteration or already exists), verify it works correctly and signal completion immediately.
+{{#if config.verification.enabled}}
+**IMPORTANT**: Do NOT run \`br close\` or \`br sync\` — the engine handles bead closure after AC verification.
+{{/if}}
 
 When finished (or if already complete), signal completion with:
 <promise>COMPLETE</promise>

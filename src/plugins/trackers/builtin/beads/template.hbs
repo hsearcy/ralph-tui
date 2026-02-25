@@ -57,9 +57,14 @@ We are working in a project to implement the following Product Requirements Docu
 {{else}}
 8. Do NOT create git commits. Leave all changes uncommitted for manual review.
 {{/if}}
-9. Close the bead: `bd close {{taskId}} --db {{beadsDbPath}} --reason "Brief description"`
-10. Document learnings (see below)
+9. Document learnings (see below)
+{{#if config.verification.enabled}}
+10. **DO NOT** close the bead yourself — the engine will close it automatically after verifying acceptance criteria
 11. Signal completion
+{{else}}
+10. Close the bead: `bd close {{taskId}} --db {{beadsDbPath}} --reason "Brief description"`
+11. Signal completion
+{{/if}}
 
 ## Before Completing
 APPEND to `.ralph-tui/progress.md`:
@@ -77,6 +82,9 @@ If you discovered a **reusable pattern**, also add it to the `## Codebase Patter
 
 ## Stop Condition
 **IMPORTANT**: If the work is already complete (implemented in a previous iteration or already exists), verify it works correctly and signal completion immediately.
+{{#if config.verification.enabled}}
+**IMPORTANT**: Do NOT run `bd close` — the engine handles bead closure after AC verification.
+{{/if}}
 
 When finished (or if already complete), signal completion with:
 <promise>COMPLETE</promise>

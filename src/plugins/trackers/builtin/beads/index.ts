@@ -54,6 +54,7 @@ interface BeadJson {
     dependency_type: 'blocks' | 'parent-child';
   }>;
   external_ref?: string;
+  acceptance_criteria?: string;
 }
 
 /**
@@ -202,6 +203,7 @@ function beadToTask(bead: BeadJson): TrackerTask {
     status: mapStatus(bead.status),
     priority: mapPriority(bead.priority),
     description: bead.description,
+    acceptanceCriteria: bead.acceptance_criteria,
     labels: bead.labels,
     type: bead.issue_type,
     parentId,

@@ -2348,6 +2348,29 @@ export class ExecutionEngine {
         timeout: verificationConfig.timeoutMs,
         flags,
         sandbox: this.config.sandbox,
+        // Use stream-json output so verification output streams in real-time
+        // (same as the main agent call — without this, stdout is buffered)
+        subagentTracing: true,
+        onStdout: (data) => {
+          this.emit({
+            type: 'agent:output',
+            timestamp: new Date().toISOString(),
+            stream: 'stdout',
+            data,
+            taskId: task.id,
+            iteration,
+          });
+        },
+        onStderr: (data) => {
+          this.emit({
+            type: 'agent:output',
+            timestamp: new Date().toISOString(),
+            stream: 'stderr',
+            data,
+            taskId: task.id,
+            iteration,
+          });
+        },
       });
 
       const result = await handle.promise;

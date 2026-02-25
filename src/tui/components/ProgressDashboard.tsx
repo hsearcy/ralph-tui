@@ -61,6 +61,16 @@ export interface ProgressDashboardProps {
     outputTokens: number;
     totalTokens: number;
   };
+  /** Whether acceptance criteria verification is enabled in config */
+  verificationEnabled?: boolean;
+  /** Current acceptance criteria verification status (only shown when enabled) */
+  verificationStatus?: {
+    state: 'verifying' | 'passed' | 'failed';
+    taskId: string;
+    attempt?: number;
+    maxAttempts?: number;
+    reason?: string;
+  };
 }
 
 /**
@@ -148,6 +158,8 @@ export function ProgressDashboard({
   activeWorkerCount,
   totalWorkerCount,
   aggregateUsage,
+  verificationEnabled,
+  verificationStatus,
 }: ProgressDashboardProps): ReactNode {
   const statusDisplay = getStatusDisplay(status, currentTaskId);
   const sandboxDisplay = getSandboxDisplay(sandboxConfig, resolvedSandboxMode);
@@ -217,6 +229,39 @@ export function ProgressDashboard({
             <text fg={colors.accent.tertiary}>{currentTaskId}</text>
             <text fg={colors.fg.dim}>-</text>
             <text fg={colors.fg.primary}>{taskDisplay}</text>
+          </box>
+        )}
+
+        {/* Verification status - shown when AC verification is enabled */}
+        {verificationEnabled && (
+          <box style={{ flexDirection: 'row', gap: 1 }}>
+            {!verificationStatus && (
+              <text fg={colors.status.info}>AC verify: on</text>
+            )}
+            {verificationStatus?.state === 'verifying' && (
+              <>
+                <text fg={colors.status.info}>{statusIndicators.selecting} Verifying AC</text>
+                <text fg={colors.fg.muted}>
+                  ({verificationStatus.attempt}/{verificationStatus.maxAttempts})
+                </text>
+              </>
+            )}
+            {verificationStatus?.state === 'passed' && (
+              <text fg={colors.status.success}>✓ AC verified</text>
+            )}
+            {verificationStatus?.state === 'failed' && (
+              <>
+                <text fg={colors.status.error}>✗ AC failed</text>
+                <text fg={colors.fg.muted}>
+                  ({verificationStatus.attempt}/{verificationStatus.maxAttempts})
+                </text>
+                {verificationStatus.reason && (
+                  <text fg={colors.fg.dim}>
+                    {' '}{truncateText(verificationStatus.reason, 40)}
+                  </text>
+                )}
+              </>
+            )}
           </box>
         )}
 
