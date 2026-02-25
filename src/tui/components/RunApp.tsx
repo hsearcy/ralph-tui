@@ -254,6 +254,7 @@ function trackerTaskToTaskItem(task: TrackerTask): TaskItem {
     title: task.title,
     status: trackerStatusToTaskStatus(task.status),
     description: task.description,
+    acceptanceCriteria: task.acceptanceCriteria,
     priority: task.priority,
     labels: task.labels,
     type: task.type,

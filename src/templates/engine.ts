@@ -258,18 +258,22 @@ function stripAcceptanceCriteria(description: string | undefined): string {
  * @param task The task to extract criteria from
  * @returns Formatted acceptance criteria string
  */
-function getAcceptanceCriteria(task: TrackerTask): string {
-  // First check metadata (used by JSON tracker)
+export function getAcceptanceCriteria(task: TrackerTask): string {
+  // First check first-class field (used by beads/beads-rust trackers)
+  if (task.acceptanceCriteria?.trim()) {
+    return task.acceptanceCriteria.trim();
+  }
+
+  // Then check metadata array (used by JSON tracker)
   const metaCriteria = task.metadata?.acceptanceCriteria;
   if (Array.isArray(metaCriteria) && metaCriteria.length > 0) {
-    // Format array as checklist
     return metaCriteria
       .filter((c): c is string => typeof c === 'string')
       .map((c) => `- [ ] ${c}`)
       .join('\n');
   }
 
-  // Fall back to extracting from description (used by Beads tracker)
+  // Fall back to extracting from description
   return extractAcceptanceCriteria(task.description);
 }
 
@@ -339,12 +343,13 @@ export function buildTemplateVariables(
 
   // Extract AC first - if we got it from description, strip it from taskDescription
   const acceptanceCriteria = getAcceptanceCriteria(task);
-  const hasMetadataCriteria =
-    Array.isArray(task.metadata?.acceptanceCriteria) &&
-    task.metadata.acceptanceCriteria.length > 0;
+  const hasExplicitCriteria =
+    !!task.acceptanceCriteria?.trim() ||
+    (Array.isArray(task.metadata?.acceptanceCriteria) &&
+      task.metadata.acceptanceCriteria.length > 0);
 
-  // Only strip AC from description if it was embedded there (not from metadata)
-  const taskDescription = hasMetadataCriteria
+  // Only strip AC from description if it was embedded there (not from a dedicated field)
+  const taskDescription = hasExplicitCriteria
     ? (task.description ?? '')
     : stripAcceptanceCriteria(task.description);
 
